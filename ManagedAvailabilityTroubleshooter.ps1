@@ -15,6 +15,15 @@
 	https://github.com/SammyKrosoft/ManagedAvailabilityTroubleshooter
 
 #>
+[CmdletBinding()]
+Param(
+	[string]$pathforlogs,
+	[switch]$Collect , 
+	[switch]$AllServers , 
+	[switch]$OnlyThisServer ,
+	[switch]$ExportCSVInsteadOfGridView,
+	[switch]$Help
+	)
 
 <# -------------------------- SCRIPT_HEADER (Only Get-Help comments and Param() above this point) -------------------------- #>
 #Initializing a $Stopwatch variable to use to measure script execution
@@ -30,16 +39,6 @@ $ScriptVersion = "1.0"
 v1.0: forked from Jérôme Coiffin original script, added ExportCSVInsteadOfGridView and headers
 #>
 <# -------------------------- /SCRIPT_HEADER -------------------------- #>
-
-[cmdletbinding()]
-Param(
-	[string]$pathforlogs,
-	[switch]$Collect , 
-	[switch] $AllServers , 
-	[switch] $OnlyThisServer ,
-	[switch] $ExportCSVInsteadOfGridView,
-	[switch]$Help
-	)
 
 $Script:lastProbeerror = $null
 $Script:foundissue = $false
