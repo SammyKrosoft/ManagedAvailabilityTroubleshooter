@@ -1,10 +1,45 @@
-﻿# Managed Availability Troubleshooter
-# The goal of this script is to more easily investigate issues related of Managed Availability including ForceReboot/Recovery Actions triggered by Exchange 2013
-# Written by Jérôme Coiffin
-#  Provide your feedback to jcoiffin@microsoft.com
+﻿<#
+.DESCRIPTION
+	Forked from Jérôme Coiffin by Sammy Krosoft
+	Managed Availability Troubleshooter
+	The goal of this script is to more easily investigate issues related of Managed Availability including ForceReboot/Recovery Actions triggered by Exchange 2013
+	Written by Jérôme Coiffin
+	Provide your feedback to jcoiffin@microsoft.com
+
+.LINK
+	Jérôme Coiffin original script:
+	https://github.com/jcoiffin/ManagedAvailabilityTroubleshooter
+
+.LINK
+	Sammy Krosoft repository for the forked script from Jérôme:
+	https://github.com/SammyKrosoft/ManagedAvailabilityTroubleshooter
+
+#>
+
+<# -------------------------- SCRIPT_HEADER (Only Get-Help comments and Param() above this point) -------------------------- #>
+#Initializing a $Stopwatch variable to use to measure script execution
+$stopwatch =  [system.diagnostics.stopwatch]::StartNew()
+#Using Write-Debug and playing with $DebugPreference -> "Continue" will output whatever you put on Write-Debug "Your text/values"
+# and "SilentlyContinue" will output nothing on Write-Debug "Your text/values"
+$DebugPreference = "Continue"
+# Set Error Action to your needs
+$ErrorActionPreference = "SilentlyContinue"
+#Script Version
+$ScriptVersion = "1.0"
+<#
+v1.0: forked from Jérôme Coiffin original script, added ExportCSVInsteadOfGridView and headers
+#>
+<# -------------------------- /SCRIPT_HEADER -------------------------- #>
 
 [cmdletbinding()]
-Param([string]$pathforlogs,[switch]$Collect , [switch] $AllServers , [switch] $OnlyThisServer , [switch]$Help)
+Param(
+	[string]$pathforlogs,
+	[switch]$Collect , 
+	[switch] $AllServers , 
+	[switch] $OnlyThisServer ,
+	[switch] $ExportCSVInsteadOfGridView,
+	[switch]$Help
+	)
 
 $Script:lastProbeerror = $null
 $Script:foundissue = $false
@@ -80,7 +115,11 @@ Param( [String] $ProbeResulteventcompletecmd , [String] $FilterXpath , [String] 
 		    }
 		}
 		if ($Script:KnownIssueDetectionAlreadydone -eq $false) {KnownIssueDetection $MonitorToInvestigate $ResponderToInvestigate}
-		$Probeevents | Select-Object -Property @{n="ExecutionStartTime (GMT)";e={$_.ExecutionStartTime}},@{n="ExecutionEndTime (GMT)";e={$_.ExecutionEndTime}},@{n='ResultType';e={$_.ResultType -replace "1","Timeout"-replace "2","Poisoned" -replace "3","Succeeded" -replace "4","Failed" -replace "5","Quarantined" -replace "6","Rejected"}},@{n='Error';e={$_.Error -replace "`r`n","`r"}},@{n='Exception';e={$_.Exception -replace "`r`n","`r"}},FailureContext,@{n='ExecutionContext';e={$_.ExecutionContext -replace "`r`n","`r"}},RetryCount,ServiceName,ResultName,StateAttribute*| Out-GridView -title $titleprobeevents
+		If (!($ExportCSVInsteadOfGridView)){
+			$Probeevents | Select-Object -Property @{n="ExecutionStartTime (GMT)";e={$_.ExecutionStartTime}},@{n="ExecutionEndTime (GMT)";e={$_.ExecutionEndTime}},@{n='ResultType';e={$_.ResultType -replace "1","Timeout"-replace "2","Poisoned" -replace "3","Succeeded" -replace "4","Failed" -replace "5","Quarantined" -replace "6","Rejected"}},@{n='Error';e={$_.Error -replace "`r`n","`r"}},@{n='Exception';e={$_.Exception -replace "`r`n","`r"}},FailureContext,@{n='ExecutionContext';e={$_.ExecutionContext -replace "`r`n","`r"}},RetryCount,ServiceName,ResultName,StateAttribute*| Out-GridView -title $titleprobeevents
+		} Else {
+			$Probeevents | Select-Object -Property @{n="ExecutionStartTime (GMT)";e={$_.ExecutionStartTime}},@{n="ExecutionEndTime (GMT)";e={$_.ExecutionEndTime}},@{n='ResultType';e={$_.ResultType -replace "1","Timeout"-replace "2","Poisoned" -replace "3","Succeeded" -replace "4","Failed" -replace "5","Quarantined" -replace "6","Rejected"}},@{n='Error';e={$_.Error -replace "`r`n","`r"}},@{n='Exception';e={$_.Exception -replace "`r`n","`r"}},FailureContext,@{n='ExecutionContext';e={$_.ExecutionContext -replace "`r`n","`r"}},RetryCount,ServiceName,ResultName,StateAttribute*| Export-CSV -NoTypeInformation -Path "$PSScriptRoot\$TitleProbeEvents_$(Get-Date -Format yyyyMMdd-HHmmss).csv"
+		}
 	}
 	if ($Script:KnownIssueDetectionAlreadydone -eq $false) {KnownIssueDetection $MonitorToInvestigate $ResponderToInvestigate}
 }
@@ -309,7 +348,12 @@ Param([String]$MaintenanceFailureMonitor , [String] $ResponderToInvestigate)
 		write-progress "Checking Maintenance Result warnings and errors"
 		$Script:lastProbeerror = $MaintenanceResults[0]
 		if ($Script:KnownIssueDetectionAlreadydone -eq $false) {KnownIssueDetection $MonitorToInvestigate $ResponderToInvestigate}
-		$MaintenanceResults |out-gridview -title "Maintenance warnings and alerts"	
+		
+		If (!($ExportCSVInsteadOfGridView)){
+			$MaintenanceResults |out-gridview -title "Maintenance warnings and alerts"
+		} Else {
+			$MaintenanceResults | Export-CSV -NoTypeInformation -Path "$PSScriptRoot\MaintenanceWarningAlerts_$(Get-Date -Format yyyyMMdd-HHmmss).csv"
+		}
 	}
 }
 
@@ -1418,7 +1462,12 @@ if ($Investigationchoose -eq 3)
 	$alertoutgridviewcmd = '$alerteventsprops | select -Property '
 	if ($CheckAlertsForMultipleMachines)
 	{$alertoutgridviewcmd += "MachineName," }
-	$alertoutgridviewcmd += 'TimeCreated, Monitor,HealthSet,Subject,Message | Out-GridView -title "SCOM Alerts"'
+	
+	if (!($ExportCSVInsteadOfGridView)){
+		$alertoutgridviewcmd += 'TimeCreated, Monitor,HealthSet,Subject,Message | Out-GridView -title "SCOM Alerts"'
+	} Else {
+		$alertoutgridviewcmd += 'TimeCreated, Monitor,HealthSet,Subject,Message | Export-CSV -NoTypeInformation -Path "$PSScriptRoot\SCOMAlerts_$(Get-Date -Format yyyyMMdd-HHmmss).csv"'
+	}
 	invoke-expression $alertoutgridviewcmd
 }
 if ($Investigationchoose -eq 4)
@@ -1433,3 +1482,12 @@ if (($Investigationchoose -eq 6) -and ($exchangeversion))
 {	
 	CollectMaLogs $MyInvocation.MyCommand.Path
 }
+
+<# -------------------------- SCRIPT_FOOTER -------------------------- #>
+#Stopping StopWatch and report total elapsed time (TotalSeconds, TotalMilliseconds, TotalMinutes, etc...
+$stopwatch.Stop()
+$msg = "`n`nThe script took $([math]::round($($StopWatch.Elapsed.TotalSeconds),2)) seconds to execute..."
+Write-Host $msg
+$msg = $null
+$StopWatch = $null
+<# -------------------------- /SCRIPT_FOOTER (NOTHING BEYOND THIS POINT) -------------------------- #>
